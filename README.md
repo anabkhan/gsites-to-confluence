@@ -30,13 +30,13 @@ const SITE_HOME = 'https://sites.google.com/view/adnananabgsite/home';
 // This the html element from home page of google site which is parent of elements which has list of menu heirarchy
 const MENU_PARENT_SELECTOR = '.jYxBte.Fpy8Db';
 ```
-![MenuParentExample](Images/GSiteMainSelector.png)
+![MenuParentExample](readme-images/GSiteMainSelector.png)
 
 ```js
 // This the html element which has the text content as the title of the menu content
 const MENU_SELECTOR = '.aJHbb.hDrhEe.HlqNPb';
 ```
-![MenuParentExample](Images/GSiteMenuSelector.png)
+![MenuParentExample](readme-images/GSiteMenuSelector.png)
 
 ### Edit file confluence-utility.js, and change following values
 
