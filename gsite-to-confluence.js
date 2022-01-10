@@ -13,7 +13,10 @@ const MENU_SELECTOR = '.aJHbb.hDrhEe.HlqNPb';
 const PARA_SELECTOR = 'p.CDt4Ke.zfr3Q';
 const H1_SELECTOR = 'h1.heading'
 
-
+const command = process.argv[2];
+if (!command) {
+    throw "Please provide command as a first argument (printmenu/migrate)";
+}
 async function run() {
 
 
@@ -125,7 +128,13 @@ async function run() {
         }
     }
 
-    createPages(null, makeChildren(menuParent))
+    if (command && command == 'printmenu') {
+        console.log(JSON.stringify(makeChildren(menuParent), null, 2))
+    }
+
+    if (command && command == 'migrate') {
+        createPages(null, makeChildren(menuParent))   
+    }
 }
 
 run();
