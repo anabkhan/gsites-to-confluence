@@ -1,6 +1,7 @@
 const puppeteer = require('puppeteer');
 const { makeChildren } = require('./common-util');
 const { createPage } = require('./confluence-utility');
+const { parseHTMLDoc, parseElement } = require('./gsite-parser');
 
 const SITE_HOME = 'https://sites.google.com/view/adnananabgsite/home';
 
@@ -35,6 +36,8 @@ async function run() {
     console.log('Page loaded')
 
     const menuParent = await page.$eval(MENU_PARENT_SELECTOR, el => {
+
+        const MENU_SELECTOR = '.aJHbb.hDrhEe.HlqNPb';
 
         function getSpace(level) {
             let space = "";
@@ -76,22 +79,34 @@ async function run() {
                 await newTab.goto(pageUrl);
 
                 try {
-                    await newTab.waitForSelector('[data-type="1"]', { visible: false, timeout: 900000 })
+                    console.log('Loading Page ', pageUrl)
+                    await newTab.waitForSelector('script', { visible: false, timeout: 900000 })
 
-                    const inner_html = await newTab.$eval(PARA_SELECTOR, element => element.innerHTML);
+                    await newTab.exposeFunction("parseHTMLDoc", parseHTMLDoc);
+                    await newTab.exposeFunction("parseElement", parseElement);
+                    const bodyHandle = await newTab.$('body');
+                    const html = await newTab.evaluate(async body => {
+                        let htmlPage = '';
+                        const childs = body.querySelectorAll('*');
+                        for (let index = 0; index < childs.length; index++) {
+                            const element = childs[index];
+                            htmlPage = htmlPage + await parseElement(element.tagName.toLowerCase(),element.outerHTML, element.textContent)
+                        }
+                        return htmlPage;
+                    }, bodyHandle);
+                    await bodyHandle.dispose();
+
+                    console.log('html',html)
 
 
-                    // If inner_html is not empty, then lets create a page in the confluence
-                    if (inner_html && inner_html != "") {
-                        // console.log('creating page in confluence')
-                        pageContent = inner_html;
+                    if (html && html != "") {
+                        pageContent = html;
                     }
 
                 } catch (error) {
-
+                    console.log(error)
                 }
                 newTab.close();
-
             }
 
 
@@ -104,15 +119,16 @@ async function run() {
                 "body": {
                     "storage": {
                         "value": pageContent,
-                        "representation": "wiki"
+                        "representation": "storage"
                     }
                 }
             };
 
             if (ancestor) {
-                pageData.ancestors = [{"id":ancestor}]
+                pageData.ancestors = [{ "id": ancestor }]
             }
 
+            
             await createPage(pageData).then(response => {
                 console.log(
                     `Response: ${response.status} ${response.statusText}`
@@ -125,6 +141,7 @@ async function run() {
                 createPages(text.id,eachPage.children);
             })
             .catch(err => console.error(err));
+            
         }
     }
 
@@ -133,7 +150,7 @@ async function run() {
     }
 
     if (command && command == 'migrate') {
-        createPages(null, makeChildren(menuParent))   
+        createPages(null, makeChildren(menuParent))
     }
 }
 
