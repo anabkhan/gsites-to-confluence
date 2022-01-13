@@ -1,16 +1,15 @@
 const fetch = require('node-fetch');
 
 const URL = "https://anabadnan.atlassian.net/wiki/rest/api";
-const API_TOKEN = 'Basic YW5hYmFkbmFuMDA3QGdtYWlsLmNvbTpHWldXUDBJWUtKSGd6MkhpOXZNVTQ5QkQ=';
 
 const CONTENT_API = URL + '/content';
 
 module.exports = {
-    createPage : async (content) => {
+    createPage : async (content, apiToken) => {
         return fetch(CONTENT_API, {
             method: 'POST',
             headers: {
-                'Authorization': API_TOKEN,
+                'Authorization': `Basic ${apiToken}`,
                 'Accept': 'application/json',
                 'Content-Type': 'application/json'
             },

@@ -14,6 +14,21 @@ parsers = {
     p: common
 }
 
+const supportedStyles = [{name:'fontSize',tag:'font-size'}, {name:'fontFamily', tag:'font-family'}];
+
+function getSupportedStyleString(computedStyle) {
+    let styleStr = '';
+    for (let index = 0; index < supportedStyles.length; index++) {
+        const supportedStyle = supportedStyles[index];
+        const value = computedStyle[supportedStyle.name];
+        if (value) {
+            styleStr = styleStr + supportedStyle.tag + ':' + value + ';';
+        }
+        
+    }
+    return styleStr;
+}
+
 module.exports = {
     parseHTMLDoc: (el) => {
         console.log('parsing element')
@@ -37,12 +52,19 @@ module.exports = {
         return pageContent;
     },
 
-    parseElement: async (tag, html, text) => {
+    parseElement: async (tag, html, text, innerHTML, computedStyle) => {
+        let parsedHtml;
         switch (tag.trim()) {
             case 'h1':
             case 'h2':
+                parsedHtml = `<${tag}>${text}</${tag}>`;
+                Promise.resolve(parsedHtml)
+                return parsedHtml;
+
             case 'p':
-                const parsedHtml = `<${tag}>${text}</${tag}>`;
+                // console.log(computedStyle)
+                const style = getSupportedStyleString(computedStyle)
+                parsedHtml = `<${tag} style="${style}">${innerHTML}</${tag}>`;
                 Promise.resolve(parsedHtml)
                 return parsedHtml;
 

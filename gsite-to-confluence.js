@@ -1,9 +1,15 @@
-const puppeteer = require('puppeteer');
+// const puppeteer = require('puppeteer');
+const puppeteer = require('puppeteer-extra');
 const { makeChildren } = require('./common-util');
 const { createPage } = require('./confluence-utility');
 const { parseHTMLDoc, parseElement } = require('./gsite-parser');
 
-const SITE_HOME = 'https://sites.google.com/view/adnananabgsite/home';
+const StealthPlugin = require('puppeteer-extra-plugin-stealth');
+puppeteer.use(StealthPlugin());
+
+// const SITE_HOME = 'https://sites.google.com/view/adnananabgsite/home';
+
+const SITE_HOME = 'https://sites.google.com/exotel.in/tech/home';
 
 // Menu Selectors
 
@@ -20,11 +26,28 @@ if (!command) {
 }
 async function run() {
 
+    if (command == 'signin') {
+        // Launch Browser
+        const browser = await puppeteer.launch({
+            executablePath: '/usr/bin/chromium-browser',
+            args: ['--no-sandbox'],
+            headless: false,
+            userDataDir: "./user_data"
+        });
+        const page = await browser.newPage();
+
+        // Go to google site
+        await page.goto(SITE_HOME);
+        return;
+    }
+
 
     // Launch Browser
     const browser = await puppeteer.launch({
         executablePath: '/usr/bin/chromium-browser',
-        headless: true
+        headless: true,
+        args: ['--no-sandbox'],
+        userDataDir: "./user_data"
     });
     const page = await browser.newPage();
 
@@ -33,7 +56,7 @@ async function run() {
 
     await page.waitForSelector(MENU_PARENT_SELECTOR, { visible: false, timeout: 900000 })
 
-    console.log('Page loaded')
+    // console.log('Page loaded')
 
     const menuParent = await page.$eval(MENU_PARENT_SELECTOR, el => {
 
@@ -48,6 +71,7 @@ async function run() {
         }
 
         const menus = el.querySelectorAll(MENU_SELECTOR);
+        // console.log('Menus size ', menus.length)
         let items = '';
         for (let index = 0; index < menus.length; index++) {
             const item = menus.item(index);
@@ -79,7 +103,7 @@ async function run() {
                 await newTab.goto(pageUrl);
 
                 try {
-                    console.log('Loading Page ', pageUrl)
+                    // console.log('Loading Page ', pageUrl)
                     await newTab.waitForSelector('script', { visible: false, timeout: 900000 })
 
                     await newTab.exposeFunction("parseHTMLDoc", parseHTMLDoc);
@@ -90,13 +114,13 @@ async function run() {
                         const childs = body.querySelectorAll('*');
                         for (let index = 0; index < childs.length; index++) {
                             const element = childs[index];
-                            htmlPage = htmlPage + await parseElement(element.tagName.toLowerCase(),element.outerHTML, element.textContent)
+                            htmlPage = htmlPage + await parseElement(element.tagName.toLowerCase(), element.outerHTML, element.textContent, element.innerHTML, getComputedStyle(element))
                         }
                         return htmlPage;
                     }, bodyHandle);
                     await bodyHandle.dispose();
 
-                    console.log('html',html)
+                    console.log(html)
 
 
                     if (html && html != "") {
@@ -128,8 +152,15 @@ async function run() {
                 pageData.ancestors = [{ "id": ancestor }]
             }
 
-            
-            await createPage(pageData).then(response => {
+            createPages(null, eachPage.children);
+
+            const apiToken = process.argv[2];
+            if (!apiToken) {
+                throw "Please provide api toke as a second argument"
+            }
+
+            /*
+            await createPage(pageData, apiToken).then(response => {
                 console.log(
                     `Response: ${response.status} ${response.statusText}`
                 );
@@ -141,7 +172,8 @@ async function run() {
                 createPages(text.id,eachPage.children);
             })
             .catch(err => console.error(err));
-            
+            */
+
         }
     }
 
