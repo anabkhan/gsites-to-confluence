@@ -108,13 +108,79 @@ async function run() {
 
                     await newTab.exposeFunction("parseHTMLDoc", parseHTMLDoc);
                     await newTab.exposeFunction("parseElement", parseElement);
-                    const bodyHandle = await newTab.$('body');
+
+
+
+                    // await newTab.exposeFunction("getClosingTag", getClosingTag);
+
+                    const bodyHandle = await newTab.$('.UtePc.RCETm.yxgWrb');
                     const html = await newTab.evaluate(async body => {
                         let htmlPage = '';
                         const childs = body.querySelectorAll('*');
                         for (let index = 0; index < childs.length; index++) {
                             const element = childs[index];
-                            htmlPage = htmlPage + await parseElement(element.tagName.toLowerCase(), element.outerHTML, element.textContent, element.innerHTML, getComputedStyle(element))
+
+                            const parentTag = element.parentNode ? element.parentNode.nodeName.toLowerCase() : null;
+
+                            const nextElement = index < childs.length - 1 ? childs[index + 1] : null;
+                            const nextElementTag = nextElement ? nextElement.nodeName.toLowerCase() : null;
+
+                            const nextSiblingTag = element.nextSibling ? element.nextSibling.nodeName.toLowerCase() : null;
+
+                            function isLiHasOl(element) {
+                                return element && element.tagName.toLowerCase() == 'li' && element.children && element.children.length > 0
+                                && (element.children[0].nodeName.toLowerCase() == 'ol' || element.children[0].nodeName.toLowerCase() == 'ul')
+                            }
+
+                            function isOlHasSingleLi(element) {
+                                return (element.tagName.toLowerCase() == 'ol' || element.tagName.toLowerCase() == 'ul') && element.children && element.children.length < 2
+                                && isLiHasOl(element.children[0]);
+                            }
+
+                            function getClosingTag(element) {
+                                let closingTag = '';
+                                const parentTag = element.parentNode ? element.parentNode.nodeName.toLowerCase() : null;
+                                if (parentTag == 'li' || parentTag == 'ol' || parentTag == 'ul') {
+                                    // get next sibling of parent
+                                    // const nextSiblingOfParent = element.parentNode ? element.parentNode.nextSibling : null;
+
+                                    if (!element.parentNode.nextSibling) {
+                                        const parentOfParent = element.parentNode.parentNode;
+                                        if (parentOfParent) {
+                                            const parentOfParentTag = parentOfParent.nodeName.toLowerCase();
+                                            if (parentOfParentTag == 'ol' || parentOfParentTag == 'ul' || parentOfParentTag == 'li') {
+                                                // lets skip <ol> which has only one <li> as in confluence it shows the bullets
+                                                if (!(isOlHasSingleLi(parentOfParent))) {
+                                                    if (!(parentOfParentTag == 'li' && (parentTag == 'ul' && parentTag == 'ol' && isOlHasSingleLi(parentOfParent.parentNode)))) {
+                                                        closingTag = `</${parentOfParentTag}>` + getClosingTag(element.parentNode);
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                return closingTag;
+                            }
+
+                            // lets determine the closing tag
+                            let closingTag = element.nodeName.toLowerCase() == 'p' && !element.nextSibling ? getClosingTag(element) : null;
+
+                            // lets skip <ol> which has only one <li> as in confluence it shows the bullets
+                            if (isOlHasSingleLi(element)) {
+                                continue;
+                            }
+
+                            if (element.nodeName.toLowerCase() == 'li' && element.children && element.children.length > 0) {
+                                const firstChild = element.children[0].tagName.toLowerCase();
+                                if (firstChild == 'ul' || firstChild == 'ol') {
+                                    if (isOlHasSingleLi(element.parentNode)) {
+                                        continue;
+                                    }
+                                }
+                            }
+
+                            htmlPage = htmlPage + await parseElement(element.tagName.toLowerCase(), element.outerHTML,
+                                element.textContent, element.innerHTML, getComputedStyle(element), parentTag, nextElementTag, nextSiblingTag, closingTag)
                         }
                         return htmlPage;
                     }, bodyHandle);
@@ -152,27 +218,28 @@ async function run() {
                 pageData.ancestors = [{ "id": ancestor }]
             }
 
-            createPages(null, eachPage.children);
+            // createPages(null, eachPage.children);
 
-            const apiToken = process.argv[2];
+            const apiToken = process.argv[5];
             if (!apiToken) {
-                throw "Please provide api toke as a second argument"
+                throw "Please provide api token as fifth argument"
             }
 
-            /*
+
             await createPage(pageData, apiToken).then(response => {
+                // console.log('response', response.body)
                 console.log(
                     `Response: ${response.status} ${response.statusText}`
                 );
                 return response.json();
             })
-            .then(text => {
-                console.log(text.id);
-                // Lets create child pages
-                createPages(text.id,eachPage.children);
-            })
-            .catch(err => console.error(err));
-            */
+                .then(text => {
+                    console.log(text);
+                    // Lets create child pages
+                    // createPages(text.id,eachPage.children);
+                })
+                .catch(err => console.error(err));
+
 
         }
     }
@@ -183,6 +250,27 @@ async function run() {
 
     if (command && command == 'migrate') {
         createPages(null, makeChildren(menuParent))
+    }
+
+    if (command && command == 'migratepage') {
+        const pageTitle = process.argv[3];
+        if (!pageTitle) {
+            throw "Please provide page title as third argument"
+        }
+
+        const pageUrl = process.argv[4];
+        if (!pageUrl) {
+            throw "Please provide page url as fourth argument"
+        }
+        createPages(null, [{
+            "value": {
+                "title": pageTitle,
+                "url": pageUrl,
+                "type": "page"
+            },
+            "children": []
+        }])
+
     }
 }
 
