@@ -18,7 +18,9 @@ function addslashes( str ) {
     return (str + '').replace(/[\\"']/g, '\\$&').replace(/\u0000/g, '\\0');
 }
 
-const supportedStyles = [{name:'fontSize',tag:'font-size'}, {name:'fontFamily', tag:'font-family'}, {name:'listStyleType', tag:'list-style-type'}];
+const supportedStyles = [{name:'fontSize',tag:'font-size'}, {name:'fontFamily', tag:'font-family'},
+{name:'listStyleType', tag:'list-style-type'}, {name:'textAlign', tag:'text-align'}, {name:'marginTop', tag:'margin-top'},
+{name:'marginLeft', tag:'margin-left'}, {name:'marginBottom', tag:'margin-bottom'}, {name:'lineHeight', tag:'line-height'}];
 
 function getSupportedStyleString(computedStyle) {
     let styleStr = '';
@@ -47,6 +49,18 @@ function safe_tags_replace(str) {
     return str.replace(/[&<>]/g, replaceTag);
 }
 
+var symbolToReplace = {
+    '=': '%3d;',
+}
+
+function replaceSymbol(symbol) {
+    return symbolToReplace[symbol] || symbol;
+}
+
+function encodeUri(uri) {
+    return encodeURI(uri).replace(/[=]/g, replaceSymbol);
+}
+
 module.exports = {
     parseHTMLDoc: (el) => {
         // Travers each element and parse through the parsers defined above
@@ -65,28 +79,31 @@ module.exports = {
         return pageContent;
     },
 
-    parseElement: async (tag, html, text, innerHTML, computedStyle, parentTag, nextElementTag, nextSiblingTag, closingTag) => {
-        let parsedHtml;
+    parseElement: async (tag, text, innerHTML, outerHTML, computedStyle, attributes) => {
+        let parsedHtml = '';
         switch (tag.trim()) {
             case 'h1':
             case 'h2':
             case 'h3':
-                parsedHtml = `<${tag}>${text}</${tag}>`;
+                parsedHtml = `<${tag} style="${getSupportedStyleString(computedStyle)}">${text}`;
                 break;
 
             case 'p':
-                // console.log(computedStyle)
+            case 'span':
                 const style = getSupportedStyleString(computedStyle)
-                // console.log('P text ', text);
-                // console.log('P parent', parentTag);
-                // console.log('p nextSibling', nextSiblingTag)
-                if (text) {
+                parsedHtml = `<${tag} style="${style}">`;
+                
+                if (text && ((text == innerHTML || safe_tags_replace(text) == innerHTML) || (innerHTML && (innerHTML.trim().startsWith(text.trim()))))) {
                     text = safe_tags_replace(text)
+                    parsedHtml = parsedHtml + text;
                 }
-                parsedHtml = `<${tag} style="${style}">${text}</${tag}>`;
+                break;
 
-                if (parentTag === 'li' && !nextSiblingTag) {
-                    parsedHtml = parsedHtml + '</li>'
+            case 'a':
+                parsedHtml = `<a href="${attributes ? encodeURIComponent(attributes.href): '#'}">`
+                if (text && ((text == innerHTML || safe_tags_replace(text) == innerHTML) || (innerHTML && (innerHTML.trim().startsWith(text.trim()))))) {
+                    text = safe_tags_replace(text)
+                    parsedHtml = parsedHtml + text;
                 }
                 break;
 
@@ -103,12 +120,21 @@ module.exports = {
                 parsedHtml = `<${tag}>`;
                 break;
 
+            case 'iframe':
+                // parsedHtml = `<${tag}>${innerHTML}`;
+                break;
+
+            case 'img':
+                console.log('image is present ', outerHTML)
+                break;
+
             default:
                 parsedHtml = '';
+                if (text && ((text == innerHTML || safe_tags_replace(text) == innerHTML) || (innerHTML && (innerHTML.trim().startsWith(text.trim()))))) {
+                    text = safe_tags_replace(text)
+                    parsedHtml = `<${tag}>${text}`;
+                }
                 break;
-        }
-        if (closingTag) {
-            parsedHtml = parsedHtml + closingTag
         }
         Promise.resolve(parsedHtml);
         return parsedHtml;

@@ -1,7 +1,9 @@
 // const puppeteer = require('puppeteer');
 const puppeteer = require('puppeteer-extra');
+const request = require('request');
+const fs = require('fs')
 const { makeChildren } = require('./common-util');
-const { createPage } = require('./confluence-utility');
+const { createPage, uploadAttachement } = require('./confluence-utility');
 const { parseHTMLDoc, parseElement } = require('./gsite-parser');
 
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
@@ -95,98 +97,131 @@ async function run() {
 
             // Get page content if its a page
             let pageContent = eachPage.value.title;
+            let images = [];
             if (eachPage.value.url) {
                 const pageUrl = 'https://sites.google.com' + eachPage.value.url;
 
+                //TEMP
+                console.log(pageUrl)
+
                 const newTab = await browser.newPage();
 
-                await newTab.goto(pageUrl);
+                await newTab.goto(pageUrl, { waitUntil: 'load' });
+
 
                 try {
                     // console.log('Loading Page ', pageUrl)
-                    await newTab.waitForSelector('script', { visible: false, timeout: 900000 })
+                    // await newTab.waitForNavigation();
+                    await newTab.waitForSelector('.UtePc.RCETm.yxgWrb', { visible: false, timeout: 900000 })
 
                     await newTab.exposeFunction("parseHTMLDoc", parseHTMLDoc);
                     await newTab.exposeFunction("parseElement", parseElement);
 
+                    // const request = require('request');
+                    async function downloadImage(src) {
+                        console.log('downloading image from ', src)
+                        const fileName = src.split('/').pop().split('#')[0].split('?')[0].split('=')[0];
+                        const path = './pageImages/' + fileName + ".png";
 
-
-                    // await newTab.exposeFunction("getClosingTag", getClosingTag);
+                        request.head(src, function(err, res, body){
+                            console.log('content-type:', res.headers['content-type']);
+                            console.log('content-length:', res.headers['content-length']);
+                        
+                            request(src).pipe(fs.createWriteStream(path)).on('close', ()=>{});
+                        });
+                    }
+                    
+                    await newTab.exposeFunction("downloadImage", downloadImage);
+                    
+                    //TEMP
+                    // await newTab.exposeFunction("getPageURL", async () => {Promise.resolve(pageUrl)});
 
                     const bodyHandle = await newTab.$('.UtePc.RCETm.yxgWrb');
-                    const html = await newTab.evaluate(async body => {
+                    const parsedHtml = await newTab.evaluate(async body => {
                         let htmlPage = '';
-                        const childs = body.querySelectorAll('*');
-                        for (let index = 0; index < childs.length; index++) {
-                            const element = childs[index];
+                        const childs = body.children;
 
-                            const parentTag = element.parentNode ? element.parentNode.nodeName.toLowerCase() : null;
-
-                            const nextElement = index < childs.length - 1 ? childs[index + 1] : null;
-                            const nextElementTag = nextElement ? nextElement.nodeName.toLowerCase() : null;
-
-                            const nextSiblingTag = element.nextSibling ? element.nextSibling.nodeName.toLowerCase() : null;
-
-                            function isLiHasOl(element) {
-                                return element && element.tagName.toLowerCase() == 'li' && element.children && element.children.length > 0
-                                && (element.children[0].nodeName.toLowerCase() == 'ol' || element.children[0].nodeName.toLowerCase() == 'ul')
+                        function isExtraListElement(element) {
+                            let extraListEl = false;
+                            const tag = element.tagName.toLowerCase();
+                            if (tag == 'li') {
+                                return isExtraListElement(element.parentElement)
                             }
-
-                            function isOlHasSingleLi(element) {
-                                return (element.tagName.toLowerCase() == 'ol' || element.tagName.toLowerCase() == 'ul') && element.children && element.children.length < 2
-                                && isLiHasOl(element.children[0]);
+                            if ((tag == 'ol' || tag == 'ul') && element.children && element.children.length < 2) {
+                                const firstChild = element.children[0];
+                                if ( firstChild.tagName.toLowerCase() == 'li' && firstChild.children && firstChild.children.length < 2 && (firstChild.children[0].tagName.toLowerCase() == 'ol' || firstChild.children[0].tagName.toLowerCase() == 'ul') ) {
+                                    extraListEl = true
+                                }
+                                
                             }
+                            return extraListEl;
+                        }
 
-                            function getClosingTag(element) {
-                                let closingTag = '';
-                                const parentTag = element.parentNode ? element.parentNode.nodeName.toLowerCase() : null;
-                                if (parentTag == 'li' || parentTag == 'ol' || parentTag == 'ul') {
-                                    // get next sibling of parent
-                                    // const nextSiblingOfParent = element.parentNode ? element.parentNode.nextSibling : null;
 
-                                    if (!element.parentNode.nextSibling) {
-                                        const parentOfParent = element.parentNode.parentNode;
-                                        if (parentOfParent) {
-                                            const parentOfParentTag = parentOfParent.nodeName.toLowerCase();
-                                            if (parentOfParentTag == 'ol' || parentOfParentTag == 'ul' || parentOfParentTag == 'li') {
-                                                // lets skip <ol> which has only one <li> as in confluence it shows the bullets
-                                                if (!(isOlHasSingleLi(parentOfParent))) {
-                                                    if (!(parentOfParentTag == 'li' && (parentTag == 'ul' && parentTag == 'ol' && isOlHasSingleLi(parentOfParent.parentNode)))) {
-                                                        closingTag = `</${parentOfParentTag}>` + getClosingTag(element.parentNode);
-                                                    }
-                                                }
-                                            }
+                        async function getHTMLOfElement(elements) {
+                            let html = '';
+                            let images = [];
+                            for (let index = 0; index < elements.length; index++) {
+                                const element = elements[index];
+                                const tag = element.tagName.toLowerCase();
+
+                                let skipParsing = isExtraListElement(element);
+
+                                let attributes;
+                                if (tag == 'a') {
+                                    const href = element.getAttribute('href');
+                                    if (href.startsWith('http')) {
+                                        attributes = {
+                                            href:element.getAttribute('href')
                                         }
                                     }
                                 }
-                                return closingTag;
-                            }
+                                
+                                // If page has image(img tag) download the image
+                                // and save to ./pageImages/pageID path 
+                                if (tag == 'img') {
+                                    const src = element.getAttribute('src');
 
-                            // lets determine the closing tag
-                            let closingTag = element.nodeName.toLowerCase() == 'p' && !element.nextSibling ? getClosingTag(element) : null;
-
-                            // lets skip <ol> which has only one <li> as in confluence it shows the bullets
-                            if (isOlHasSingleLi(element)) {
-                                continue;
-                            }
-
-                            if (element.nodeName.toLowerCase() == 'li' && element.children && element.children.length > 0) {
-                                const firstChild = element.children[0].tagName.toLowerCase();
-                                if (firstChild == 'ul' || firstChild == 'ol') {
-                                    if (isOlHasSingleLi(element.parentNode)) {
-                                        continue;
+                                    // For internal images
+                                    if (src && src.includes("googleusercontent.com")) {
+                                        // const image = await fetch(src);
+                                        const fileName = src.split('/').pop().split('#')[0].split('?')[0].split('=')[0];
+                                        // const path = './pageImages/' + fileName + ".png";
+                                        images.push(fileName);
+                                        downloadImage(src)
                                     }
                                 }
-                            }
 
-                            htmlPage = htmlPage + await parseElement(element.tagName.toLowerCase(), element.outerHTML,
-                                element.textContent, element.innerHTML, getComputedStyle(element), parentTag, nextElementTag, nextSiblingTag, closingTag)
+                                // Do not traverse children for these elements
+                                const skipChildrens = ['h1','h2','h3', 'iframe'];
+
+                                let parsedHtml = skipParsing ? '' : await parseElement(tag, element.textContent, element.innerHTML, element.outerHTML, getComputedStyle(element), attributes);
+                                let elementParsed = parsedHtml == '' ? false : true;
+                                if (element.children && element.children.length > 0) {
+                                    if (!skipChildrens.includes(tag)) {
+                                        const childHtml = await getHTMLOfElement(element.children);
+                                        parsedHtml = parsedHtml + childHtml.html
+                                        images = images.concat(childHtml.images)
+                                    }
+                                    // parsedHtml = parsedHtml + (skipChildrens.includes(tag) ? '' : await getHTMLOfElement(element.children)).html;
+                                }
+                                html = html + parsedHtml + (elementParsed ? `</${tag}>` : '');
+                            }
+                            Promise.resolve({html,images});
+                            return {html,images};
                         }
+
+                        htmlPage = await getHTMLOfElement(childs);
                         return htmlPage;
                     }, bodyHandle);
                     await bodyHandle.dispose();
 
-                    console.log(html)
+                    const html = parsedHtml.html
+                    console.log(parsedHtml.images)
+
+                    if (parsedHtml.images && parsedHtml.images.length > 0) {
+                        images = parsedHtml.images;
+                    }
 
 
                     if (html && html != "") {
@@ -218,7 +253,7 @@ async function run() {
                 pageData.ancestors = [{ "id": ancestor }]
             }
 
-            // createPages(null, eachPage.children);
+            createPages(null, eachPage.children);
 
             const apiToken = process.argv[5];
             if (!apiToken) {
@@ -226,6 +261,7 @@ async function run() {
             }
 
 
+            
             await createPage(pageData, apiToken).then(response => {
                 // console.log('response', response.body)
                 console.log(
@@ -233,14 +269,21 @@ async function run() {
                 );
                 return response.json();
             })
-                .then(text => {
-                    console.log(text);
+                .then(async text => {
+                    // console.log(text);
+
+                    // Upload images if images were present in the page
+                    for (let index = 0; index < images.length; index++) {
+                        const imageFileName = images[index];
+                        const path = './pageImages/' + imageFileName + ".png";
+                        uploadAttachement(text.id, path, imageFileName)
+                    }
+
                     // Lets create child pages
                     // createPages(text.id,eachPage.children);
                 })
                 .catch(err => console.error(err));
-
-
+      
         }
     }
 
