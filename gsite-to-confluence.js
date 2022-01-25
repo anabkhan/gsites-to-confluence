@@ -189,7 +189,17 @@ async function run() {
                                         // const path = './pageImages/' + fileName + ".png";
                                         images.push(fileName);
                                         downloadImage(src)
+                                        attributes = {
+                                            imageFileName:fileName
+                                        }
                                     }
+                                }
+
+                                function getParentTag(tag) {
+                                    if (tag == 'img') {
+                                        return '</ac:image>'
+                                    }
+                                    return `</${tag}>`
                                 }
 
                                 // Do not traverse children for these elements
@@ -205,7 +215,7 @@ async function run() {
                                     }
                                     // parsedHtml = parsedHtml + (skipChildrens.includes(tag) ? '' : await getHTMLOfElement(element.children)).html;
                                 }
-                                html = html + parsedHtml + (elementParsed ? `</${tag}>` : '');
+                                html = html + parsedHtml + (elementParsed ? getParentTag(tag) : '');
                             }
                             Promise.resolve({html,images});
                             return {html,images};
@@ -217,7 +227,7 @@ async function run() {
                     await bodyHandle.dispose();
 
                     const html = parsedHtml.html
-                    console.log(parsedHtml.images)
+                    console.log(parsedHtml.html)
 
                     if (parsedHtml.images && parsedHtml.images.length > 0) {
                         images = parsedHtml.images;
@@ -270,7 +280,7 @@ async function run() {
                 return response.json();
             })
                 .then(async text => {
-                    // console.log(text);
+                    console.log(text);
 
                     // Upload images if images were present in the page
                     for (let index = 0; index < images.length; index++) {

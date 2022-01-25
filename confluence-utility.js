@@ -7,13 +7,15 @@ const URL = "https://anabadnan.atlassian.net/wiki/rest/api";
 
 const CONTENT_API = URL + '/content';
 
+const API_TOKEN = 'token_here';
+
 module.exports = {
     createPage: async (content, apiToken) => {
         // console.log('using token', apiToken)
         return fetch(CONTENT_API, {
             method: 'POST',
             headers: {
-                'Authorization': 'Basic token',
+                'Authorization': `Basic ${API_TOKEN}`,
                 'Accept': 'application/json',
                 'Content-Type': 'application/json'
             },
@@ -39,7 +41,7 @@ module.exports = {
 
         request.post({
             url: `${CONTENT_API}/${pageID}/child/attachment`, formData: formdata, headers: {
-                'Authorization': 'Basic token',
+                'Authorization': `Basic ${API_TOKEN}`,
                 'X-Atlassian-Token': 'nocheck'
             }
         },

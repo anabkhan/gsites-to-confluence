@@ -61,6 +61,22 @@ function encodeUri(uri) {
     return encodeURI(uri).replace(/[=]/g, replaceSymbol);
 }
 
+function getMatchingSubstr(str1, str2) {
+    let matchedStr = '';
+    if (str1 && str2) {
+        const len = str1.length < str2.length ? str1.length : str2.length
+        for (let index = 0; index < len; index++) {
+            charFromStr1 = str1[index];
+            if (charFromStr1 == str2[index]) {
+                matchedStr = matchedStr + charFromStr1;
+            } else {
+                break;
+            }
+        }
+    }
+    return matchedStr
+}
+
 module.exports = {
     parseHTMLDoc: (el) => {
         // Travers each element and parse through the parsers defined above
@@ -96,6 +112,11 @@ module.exports = {
                 if (text && ((text == innerHTML || safe_tags_replace(text) == innerHTML) || (innerHTML && (innerHTML.trim().startsWith(text.trim()))))) {
                     text = safe_tags_replace(text)
                     parsedHtml = parsedHtml + text;
+                } else {
+                    const subStr = getMatchingSubstr(text, innerHTML)
+                    if (subStr) {
+                        parsedHtml = parsedHtml + subStr;
+                    }
                 }
                 break;
 
@@ -125,7 +146,10 @@ module.exports = {
                 break;
 
             case 'img':
-                console.log('image is present ', outerHTML)
+                imageFileName = attributes.imageFileName;
+                if (imageFileName) {
+                    parsedHtml = `<ac:image><ri:attachment ri:filename="${imageFileName}"/>`
+                }
                 break;
 
             default:
