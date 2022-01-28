@@ -62,6 +62,7 @@ The script will print the menu heirarchy also , so verify that the menu is prope
 ```sh
 #node gsite-to-confluence.js migratepage <page-title> <page-url> <confluence-api-key> > output.html
 node gsite-to-confluence.js migratepage metricspipeline /exotel.in/tech/developer/development-platform/internals/metrics-pipeline nnffd > output.html
+```
 
 #### Once the menu printed from previous command is verified then run the migrate command
 ```sh
