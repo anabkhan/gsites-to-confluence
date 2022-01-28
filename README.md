@@ -51,6 +51,13 @@ const API_TOKEN = 'Basic ***';
 ```
 
 ### Run the script
+
+#### Sign in to Google site
+```sh
+node gsite-to-confluence.js signin
+```
+This command will open the browser to login to the google site using google account. Once logged in, close the browser
+
 #### Print menu parsed from Google site
 ```sh
 node gsite-to-confluence.js printmenu
