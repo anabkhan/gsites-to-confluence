@@ -77,6 +77,17 @@ function getMatchingSubstr(str1, str2) {
     return matchedStr
 }
 
+async function getMatchingTrailingStr(str1, str2) {
+    str = ''
+    try {
+        // That's just one lazy approach
+        str =  getMatchingSubstr(str1.split("").reverse().join(""), str2.split("").reverse().join("")).split("").reverse().join("")
+    } catch (error) {
+    }
+    Promise.resolve(str);
+    return str;
+}
+
 module.exports = {
     parseHTMLDoc: (el) => {
         // Travers each element and parse through the parsers defined above
@@ -117,6 +128,11 @@ module.exports = {
                     if (subStr) {
                         parsedHtml = parsedHtml + subStr;
                     }
+
+                    const trailStr = getMatchingTrailingStr(text, innerHTML)
+                    if (trailStr) {
+                        attributes[trailStr] = trailStr
+                    }
                 }
                 break;
 
@@ -142,13 +158,15 @@ module.exports = {
                 break;
 
             case 'iframe':
-                // parsedHtml = `<${tag}>${innerHTML}`;
+                if (attributes && attributes.src) {
+                    parsedHtml = `<ac:structured-macro ac:name="iframe" ac:schema-version="1" data-layout="default" ac:local-id="e97e31a8-345c-454d-a344-5d0dbad1e315" ac:macro-id="e976ca49765b978e883b1fe7d2347a4b"><ac:parameter ac:name="src"><ri:url ri:value="${safe_tags_replace(attributes.src)}" /></ac:parameter><ac:parameter ac:name="width">${attributes.width}</ac:parameter><ac:parameter ac:name="class">YMEQtf KfXz0b</ac:parameter><ac:parameter ac:name="height">${attributes.height}</ac:parameter></ac:structured-macro>`
+                }
                 break;
 
             case 'img':
-                imageFileName = attributes.imageFileName;
-                if (imageFileName) {
-                    parsedHtml = `<ac:image><ri:attachment ri:filename="${imageFileName}"/>`
+                if (attributes && attributes.imageFileName) {
+                    imageFileName = attributes.imageFileName;
+                    parsedHtml = `<ac:image><ri:attachment ri:filename="${imageFileName}"/></ac:image>`;
                 }
                 break;
 
@@ -163,5 +181,6 @@ module.exports = {
         Promise.resolve(parsedHtml);
         return parsedHtml;
 
-    }
+    },
+    getMatchingTrailingStr
 };

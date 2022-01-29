@@ -4,7 +4,7 @@ const request = require('request');
 const fs = require('fs')
 const { makeChildren } = require('./common-util');
 const { createPage, uploadAttachement } = require('./confluence-utility');
-const { parseHTMLDoc, parseElement } = require('./gsite-parser');
+const { parseHTMLDoc, parseElement, getMatchingTrailingStr } = require('./gsite-parser');
 
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 puppeteer.use(StealthPlugin());
@@ -116,6 +116,7 @@ async function run() {
 
                     await newTab.exposeFunction("parseHTMLDoc", parseHTMLDoc);
                     await newTab.exposeFunction("parseElement", parseElement);
+                    await newTab.exposeFunction("getMatchingTrailingStr", getMatchingTrailingStr);
 
                     // const request = require('request');
                     async function downloadImage(src) {
@@ -157,17 +158,32 @@ async function run() {
                             return extraListEl;
                         }
 
+                        function shouldSkipElement(element) {
+                            // If style has diplay:none then skip parsing
+                            if (getComputedStyle(element).display == 'none') {
+                                return true;
+                            }
+                            return false;
+                        }
+
 
                         async function getHTMLOfElement(elements) {
                             let html = '';
                             let images = [];
                             for (let index = 0; index < elements.length; index++) {
                                 const element = elements[index];
+
+                                if (shouldSkipElement(element)) {
+                                    html = html + '';
+                                    Promise.resolve({html,images});
+                                    return {html,images};
+                                }
+
                                 const tag = element.tagName.toLowerCase();
 
                                 let skipParsing = isExtraListElement(element);
 
-                                let attributes;
+                                let attributes = {};
                                 if (tag == 'a') {
                                     const href = element.getAttribute('href');
                                     if (href.startsWith('http')) {
@@ -195,15 +211,33 @@ async function run() {
                                     }
                                 }
 
-                                function getParentTag(tag) {
+                                async function getParentTag(tag, element) {
+                                    let parentTag = `</${tag}>`
                                     if (tag == 'img') {
-                                        return '</ac:image>'
+                                        parentTag = ''
+                                    } else if (tag == 'iframe') {
+                                        parentTag = ''
+                                    } else if (tag == 'span' || tag == 'p') {
+                                        const trailStr = await getMatchingTrailingStr(element.textContent, element.innerHTML)
+                                        if (trailStr) {
+                                            parentTag = `${trailStr}</${tag}>`
+                                        }
                                     }
-                                    return `</${tag}>`
+                                    Promise.resolve(parentTag);
+                                    return parentTag
+                                }
+
+                                // handle iframe tag
+                                if (tag == 'iframe') {
+                                    attributes = {
+                                        src: element.getAttribute('src'),
+                                        width: getComputedStyle(element).width.slice(0, -2),
+                                        height: getComputedStyle(element).height.slice(0, -2)
+                                    }
                                 }
 
                                 // Do not traverse children for these elements
-                                const skipChildrens = ['h1','h2','h3', 'iframe'];
+                                const skipChildrens = ['h1','h2','h3', 'iframe', 'img'];
 
                                 let parsedHtml = skipParsing ? '' : await parseElement(tag, element.textContent, element.innerHTML, element.outerHTML, getComputedStyle(element), attributes);
                                 let elementParsed = parsedHtml == '' ? false : true;
@@ -215,7 +249,7 @@ async function run() {
                                     }
                                     // parsedHtml = parsedHtml + (skipChildrens.includes(tag) ? '' : await getHTMLOfElement(element.children)).html;
                                 }
-                                html = html + parsedHtml + (elementParsed ? getParentTag(tag) : '');
+                                html = html + parsedHtml + (elementParsed ? await getParentTag(tag, element) : '');
                             }
                             Promise.resolve({html,images});
                             return {html,images};
@@ -227,7 +261,7 @@ async function run() {
                     await bodyHandle.dispose();
 
                     const html = parsedHtml.html
-                    console.log(parsedHtml.html)
+                    // console.log(parsedHtml.html)
 
                     if (parsedHtml.images && parsedHtml.images.length > 0) {
                         images = parsedHtml.images;
@@ -263,24 +297,24 @@ async function run() {
                 pageData.ancestors = [{ "id": ancestor }]
             }
 
-            createPages(null, eachPage.children);
+            // createPages(null, eachPage.children);
 
             const apiToken = process.argv[5];
-            if (!apiToken) {
-                throw "Please provide api token as fifth argument"
-            }
+            // if (!apiToken) {
+            //     throw "Please provide api token as fifth argument"
+            // }
 
 
-            
+        //    return 
             await createPage(pageData, apiToken).then(response => {
                 // console.log('response', response.body)
                 console.log(
-                    `Response: ${response.status} ${response.statusText}`
+                    `Page: ${pageData.title} Response: ${response.status} ${response.statusText}`
                 );
                 return response.json();
             })
                 .then(async text => {
-                    console.log(text);
+                    // console.log(text);
 
                     // Upload images if images were present in the page
                     for (let index = 0; index < images.length; index++) {
