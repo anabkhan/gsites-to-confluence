@@ -73,7 +73,8 @@ async function run() {
         }
 
         const menus = el.querySelectorAll(MENU_SELECTOR);
-        // console.log('Menus size ', menus.length)
+        console.log('Pages count ', menus.length)
+        const count = menus.length
         let items = '';
         for (let index = 0; index < menus.length; index++) {
             const item = menus.item(index);
@@ -88,7 +89,7 @@ async function run() {
                 }
             )
         }
-        return items;
+        return {items, count};
     });
 
     async function createPages(ancestor, pages) {
@@ -101,15 +102,11 @@ async function run() {
             if (eachPage.value.url) {
                 const pageUrl = 'https://sites.google.com' + eachPage.value.url;
 
-                //TEMP
-                console.log(pageUrl)
-
-                const newTab = await browser.newPage();
-
-                await newTab.goto(pageUrl, { waitUntil: 'load' });
-
-
+               
                 try {
+                    const newTab = await browser.newPage();
+    
+                    await newTab.goto(pageUrl, { waitUntil: 'load' });
                     // console.log('Loading Page ', pageUrl)
                     // await newTab.waitForNavigation();
                     await newTab.waitForSelector('.UtePc.RCETm.yxgWrb', { visible: false, timeout: 900000 })
@@ -261,7 +258,7 @@ async function run() {
                     await bodyHandle.dispose();
 
                     const html = parsedHtml.html
-                    // console.log(parsedHtml.html)
+                    console.log('html',parsedHtml.html)
 
                     if (parsedHtml.images && parsedHtml.images.length > 0) {
                         images = parsedHtml.images;
@@ -273,6 +270,10 @@ async function run() {
                     }
 
                 } catch (error) {
+                    const errorMsg = `${eachPage.value.title}(${pageUrl}) failed : ${error}`
+                    fs.appendFile('output.txt', errorMsg, function (err) {
+                        if (err) throw err;
+                      });
                     console.log(error)
                 }
                 newTab.close();
@@ -281,7 +282,7 @@ async function run() {
 
             const pageData = {
                 "space": {
-                    "key": "CONFLUENCE12"
+                    "key": "~180746531"
                 },
                 "type": "page",
                 "title": eachPage.value.title,
@@ -314,7 +315,7 @@ async function run() {
                 return response.json();
             })
                 .then(async text => {
-                    // console.log(text);
+                    console.log(text);
 
                     // Upload images if images were present in the page
                     for (let index = 0; index < images.length; index++) {
@@ -326,17 +327,24 @@ async function run() {
                     // Lets create child pages
                     // createPages(text.id,eachPage.children);
                 })
-                .catch(err => console.error(err));
+                .catch(err => {
+                    const errorMsg = `${pageData.title}(${pageUrl}) failed : ${err}`
+                    fs.appendFile('output.txt', errorMsg, function (err) {
+                        if (err) throw err;
+                      });
+                    console.error(err)
+                });
       
         }
     }
 
     if (command && command == 'printmenu') {
-        console.log(JSON.stringify(makeChildren(menuParent), null, 2))
+        console.log('Total pages : ', menuParent.count)
+        console.log(JSON.stringify(makeChildren(menuParent.items), null, 2))
     }
 
     if (command && command == 'migrate') {
-        createPages(null, makeChildren(menuParent))
+        createPages(null, makeChildren(menuParent.items))
     }
 
     if (command && command == 'migratepage') {

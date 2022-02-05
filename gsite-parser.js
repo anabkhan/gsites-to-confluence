@@ -20,7 +20,7 @@ function addslashes( str ) {
 
 const supportedStyles = [{name:'fontSize',tag:'font-size'}, {name:'fontFamily', tag:'font-family'},
 {name:'listStyleType', tag:'list-style-type'}, {name:'textAlign', tag:'text-align'}, {name:'marginTop', tag:'margin-top'},
-{name:'marginLeft', tag:'margin-left'}, {name:'marginBottom', tag:'margin-bottom'}, {name:'lineHeight', tag:'line-height'}];
+{name:'marginLeft', tag:'margin-left'}, {name:'marginBottom', tag:'margin-bottom'}, {name:'lineHeight', tag:'line-height'}, {name:'backgroundColor', tag:'background-color'}];
 
 function getSupportedStyleString(computedStyle) {
     let styleStr = '';
@@ -61,9 +61,16 @@ function encodeUri(uri) {
     return encodeURI(uri).replace(/[=]/g, replaceSymbol);
 }
 
+function isHTMLTag(str) {
+    return str.startsWith('<') || str.startsWith('>')
+}
+
 function getMatchingSubstr(str1, str2) {
     let matchedStr = '';
     if (str1 && str2) {
+        if (isHTMLTag(str1) || isHTMLTag(str2)) {
+            return '';
+        }
         const len = str1.length < str2.length ? str1.length : str2.length
         for (let index = 0; index < len; index++) {
             charFromStr1 = str1[index];
@@ -137,7 +144,26 @@ module.exports = {
                 break;
 
             case 'a':
-                parsedHtml = `<a href="${attributes ? encodeURIComponent(attributes.href): '#'}">`
+                //&& (attributes.href.includes("http://www.google.com/url?q=") || attributes.href.includes("https://www.google.com/url?q="))
+                if (attributes && attributes.href) {
+                    attributes.href = decodeURIComponent(attributes.href)
+                    if ((attributes.href.includes("http://www.google.com/url?q=") || attributes.href.includes("https://www.google.com/url?q="))) {
+                        attributes.href = decodeURIComponent(attributes.href.replace("http://www.google.com/url?q=", ""))
+                        attributes.href = decodeURIComponent(attributes.href.replace("https://www.google.com/url?q=", ""))
+
+                        if (attributes.href.includes('&sa=')) {
+                            attributes.href = attributes.href.split('&sa=')[0]
+                        }
+                    }
+                    // attributes.href = decodeURIComponent(attributes.href.replace("http://www.google.com/url?q=", ""))
+                    // attributes.href = decodeURIComponent(attributes.href.replace("https://www.google.com/url?q=", ""))
+                    if (attributes.href.includes('&')) {
+                        first = attributes.href.split('&')[0]
+                        second = encodeURIComponent(attributes.href.replace(first, ''))
+                        attributes.href = first + second
+                    }
+                }
+                parsedHtml = `<a href="${attributes ? attributes.href: '#'}">`
                 if (text && ((text == innerHTML || safe_tags_replace(text) == innerHTML) || (innerHTML && (innerHTML.trim().startsWith(text.trim()))))) {
                     text = safe_tags_replace(text)
                     parsedHtml = parsedHtml + text;
