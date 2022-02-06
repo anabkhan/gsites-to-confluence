@@ -103,9 +103,9 @@ async function run() {
                 const pageUrl = 'https://sites.google.com' + eachPage.value.url;
 
                
+                const newTab = await browser.newPage();
+
                 try {
-                    const newTab = await browser.newPage();
-    
                     await newTab.goto(pageUrl, { waitUntil: 'load' });
                     // console.log('Loading Page ', pageUrl)
                     // await newTab.waitForNavigation();
@@ -122,8 +122,8 @@ async function run() {
                         const path = './pageImages/' + fileName + ".png";
 
                         request.head(src, function(err, res, body){
-                            console.log('content-type:', res.headers['content-type']);
-                            console.log('content-length:', res.headers['content-length']);
+                            // console.log('content-type:', res.headers['content-type']);
+                            // console.log('content-length:', res.headers['content-length']);
                         
                             request(src).pipe(fs.createWriteStream(path)).on('close', ()=>{});
                         });
@@ -282,7 +282,7 @@ async function run() {
 
             const pageData = {
                 "space": {
-                    "key": "~180746531"
+                    "key": "CONFLUENCE12"
                 },
                 "type": "page",
                 "title": eachPage.value.title,
@@ -290,6 +290,14 @@ async function run() {
                     "storage": {
                         "value": pageContent,
                         "representation": "storage"
+                    }
+                },
+                "metadata": {
+                    "properties": {
+                        "editor": {
+                            "key": "editor",
+                            "value": "v2"
+                        }
                     }
                 }
             };

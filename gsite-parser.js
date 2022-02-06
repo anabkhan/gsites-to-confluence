@@ -84,12 +84,14 @@ function getMatchingSubstr(str1, str2) {
     return matchedStr
 }
 
-async function getMatchingTrailingStr(str1, str2) {
+async function getMatchingTrailingStr(text, innerHTML) {
     str = ''
-    try {
-        // That's just one lazy approach
-        str =  getMatchingSubstr(str1.split("").reverse().join(""), str2.split("").reverse().join("")).split("").reverse().join("")
-    } catch (error) {
+    if (!((safe_tags_replace(text) == innerHTML) || (innerHTML && (innerHTML.trim().startsWith(text.trim()))))) {
+        try {
+            // That's just one lazy approach
+            str =  getMatchingSubstr(text.split("").reverse().join(""), innerHTML.split("").reverse().join("")).split("").reverse().join("")
+        } catch (error) {
+        }
     }
     Promise.resolve(str);
     return str;
