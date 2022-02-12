@@ -18,7 +18,7 @@ function addslashes( str ) {
     return (str + '').replace(/[\\"']/g, '\\$&').replace(/\u0000/g, '\\0');
 }
 
-const supportedStyles = [{name:'fontSize',tag:'font-size'}, {name:'fontFamily', tag:'font-family'},
+const supportedStyles = [{name:'fontSize',tag:'font-size'}, {name:'color',tag:'color'} , {name:'fontFamily', tag:'font-family'},
 {name:'listStyleType', tag:'list-style-type'}, {name:'textAlign', tag:'text-align'}, {name:'marginTop', tag:'margin-top'},
 {name:'marginLeft', tag:'margin-left'}, {name:'marginBottom', tag:'margin-bottom'}, {name:'lineHeight', tag:'line-height'}, {name:'backgroundColor', tag:'background-color'}];
 
@@ -81,7 +81,7 @@ function getMatchingSubstr(str1, str2) {
             }
         }
     }
-    return matchedStr
+    return safe_tags_replace(matchedStr)
 }
 
 async function getMatchingTrailingStr(text, innerHTML) {
@@ -121,6 +121,9 @@ module.exports = {
             case 'h1':
             case 'h2':
             case 'h3':
+                if (text) {
+                    text = safe_tags_replace(text)
+                }
                 parsedHtml = `<${tag} style="${getSupportedStyleString(computedStyle)}">${text}`;
                 break;
 
@@ -135,11 +138,13 @@ module.exports = {
                 } else {
                     const subStr = getMatchingSubstr(text, innerHTML)
                     if (subStr) {
+                        // subStr = safe_tags_replace(subStr)
                         parsedHtml = parsedHtml + subStr;
                     }
 
-                    const trailStr = getMatchingTrailingStr(text, innerHTML)
+                    const trailStr = await getMatchingTrailingStr(text, innerHTML)
                     if (trailStr) {
+                        // trailStr = safe_tags_replace(trailStr)
                         attributes[trailStr] = trailStr
                     }
                 }

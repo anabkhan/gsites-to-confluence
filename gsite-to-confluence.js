@@ -89,7 +89,7 @@ async function run() {
                 }
             )
         }
-        return {items, count};
+        return { items, count };
     });
 
     async function createPages(ancestor, pages) {
@@ -101,8 +101,9 @@ async function run() {
             let images = [];
             if (eachPage.value.url) {
                 const pageUrl = 'https://sites.google.com' + eachPage.value.url;
+                console.log('migrating ', eachPage.value.title + ' ' + eachPage.value.url)
 
-               
+
                 const newTab = await browser.newPage();
 
                 try {
@@ -121,16 +122,16 @@ async function run() {
                         const fileName = src.split('/').pop().split('#')[0].split('?')[0].split('=')[0];
                         const path = './pageImages/' + fileName + ".png";
 
-                        request.head(src, function(err, res, body){
+                        request.head(src, function (err, res, body) {
                             // console.log('content-type:', res.headers['content-type']);
                             // console.log('content-length:', res.headers['content-length']);
-                        
-                            request(src).pipe(fs.createWriteStream(path)).on('close', ()=>{});
+
+                            request(src).pipe(fs.createWriteStream(path)).on('close', () => { });
                         });
                     }
-                    
+
                     await newTab.exposeFunction("downloadImage", downloadImage);
-                    
+
                     //TEMP
                     // await newTab.exposeFunction("getPageURL", async () => {Promise.resolve(pageUrl)});
 
@@ -147,10 +148,10 @@ async function run() {
                             }
                             if ((tag == 'ol' || tag == 'ul') && element.children && element.children.length < 2) {
                                 const firstChild = element.children[0];
-                                if ( firstChild.tagName.toLowerCase() == 'li' && firstChild.children && firstChild.children.length < 2 && (firstChild.children[0].tagName.toLowerCase() == 'ol' || firstChild.children[0].tagName.toLowerCase() == 'ul') ) {
+                                if (firstChild.tagName.toLowerCase() == 'li' && firstChild.children && firstChild.children.length < 2 && (firstChild.children[0].tagName.toLowerCase() == 'ol' || firstChild.children[0].tagName.toLowerCase() == 'ul')) {
                                     extraListEl = true
                                 }
-                                
+
                             }
                             return extraListEl;
                         }
@@ -172,8 +173,8 @@ async function run() {
 
                                 if (shouldSkipElement(element)) {
                                     html = html + '';
-                                    Promise.resolve({html,images});
-                                    return {html,images};
+                                    Promise.resolve({ html, images });
+                                    return { html, images };
                                 }
 
                                 const tag = element.tagName.toLowerCase();
@@ -185,11 +186,11 @@ async function run() {
                                     const href = element.getAttribute('href');
                                     if (href.startsWith('http')) {
                                         attributes = {
-                                            href:element.getAttribute('href')
+                                            href: element.getAttribute('href')
                                         }
                                     }
                                 }
-                                
+
                                 // If page has image(img tag) download the image
                                 // and save to ./pageImages/pageID path 
                                 if (tag == 'img') {
@@ -203,7 +204,7 @@ async function run() {
                                         images.push(fileName);
                                         downloadImage(src)
                                         attributes = {
-                                            imageFileName:fileName
+                                            imageFileName: fileName
                                         }
                                     }
                                 }
@@ -234,7 +235,7 @@ async function run() {
                                 }
 
                                 // Do not traverse children for these elements
-                                const skipChildrens = ['h1','h2','h3', 'iframe', 'img'];
+                                const skipChildrens = ['h1', 'h2', 'h3', 'iframe', 'img'];
 
                                 let parsedHtml = skipParsing ? '' : await parseElement(tag, element.textContent, element.innerHTML, element.outerHTML, getComputedStyle(element), attributes);
                                 let elementParsed = parsedHtml == '' ? false : true;
@@ -248,8 +249,8 @@ async function run() {
                                 }
                                 html = html + parsedHtml + (elementParsed ? await getParentTag(tag, element) : '');
                             }
-                            Promise.resolve({html,images});
-                            return {html,images};
+                            Promise.resolve({ html, images });
+                            return { html, images };
                         }
 
                         htmlPage = await getHTMLOfElement(childs);
@@ -271,78 +272,89 @@ async function run() {
 
                 } catch (error) {
                     const errorMsg = `${eachPage.value.title}(${pageUrl}) failed : ${error}`
-                    fs.appendFile('output.txt', errorMsg, function (err) {
+                    fs.appendFile('output.txt', errorMsg + "/n", function (err) {
                         if (err) throw err;
-                      });
+                    });
                     console.log(error)
                 }
                 newTab.close();
-            }
 
-
-            const pageData = {
-                "space": {
-                    "key": "CONFLUENCE12"
-                },
-                "type": "page",
-                "title": eachPage.value.title,
-                "body": {
-                    "storage": {
-                        "value": pageContent,
-                        "representation": "storage"
-                    }
-                },
-                "metadata": {
-                    "properties": {
-                        "editor": {
-                            "key": "editor",
-                            "value": "v2"
+                const pageData = {
+                    "space": {
+                        "key": "TET"
+                    },
+                    "type": "page",
+                    "title": eachPage.value.title,
+                    "body": {
+                        "storage": {
+                            "value": pageContent,
+                            "representation": "storage"
+                        }
+                    },
+                    "metadata": {
+                        "properties": {
+                            "editor": {
+                                "key": "editor",
+                                "value": "v2"
+                            }
                         }
                     }
-                }
-            };
+                };
 
-            if (ancestor) {
-                pageData.ancestors = [{ "id": ancestor }]
+                if (ancestor) {
+                    pageData.ancestors = [{ "id": ancestor }]
+                }
+
+                // createPages(null, eachPage.children);
+
+                const apiToken = process.argv[5];
+                // if (!apiToken) {
+                //     throw "Please provide api token as fifth argument"
+                // }
+
+
+                //    return 
+                await createPage(pageData, apiToken).then(response => {
+                    // console.log('response', response.body)
+                    console.log(
+                        `Page: ${pageData.title} Response: ${response.status} ${response.statusText}`
+                    );
+                    // let responseJson = {response:response.json()}
+                    // if (response.status == 200) {
+                    // } else {
+                    //     console.log('error while creating page ', pageData.title)
+                    // }
+                    // responseJson.status = response.status;
+                    return response.json()
+                })
+                    .then(async text => {
+                        console.log(text);
+                        // Lets create child pages
+                        if (text && text.statusCode && text.statusCode == 400) {
+                            console.log('error while creating page ', pageData.title)
+                            console.log(text)
+                        } else {
+                            createPages(text.id, eachPage.children);
+                            // Upload images if images were present in the page
+                            for (let index = 0; index < images.length; index++) {
+                                const imageFileName = images[index];
+                                const path = './pageImages/' + imageFileName + ".png";
+                                uploadAttachement(text.id, path, imageFileName)
+                            }
+                        }
+
+                    })
+                    .catch(err => {
+                        const errorMsg = `${pageData.title}(${pageUrl}) failed : ${err}`
+                        fs.appendFile('output.txt', errorMsg + "/n", function (err) {
+                            if (err) throw err;
+                        });
+                        console.error(err)
+                    });
             }
 
-            // createPages(null, eachPage.children);
-
-            const apiToken = process.argv[5];
-            // if (!apiToken) {
-            //     throw "Please provide api token as fifth argument"
-            // }
 
 
-        //    return 
-            await createPage(pageData, apiToken).then(response => {
-                // console.log('response', response.body)
-                console.log(
-                    `Page: ${pageData.title} Response: ${response.status} ${response.statusText}`
-                );
-                return response.json();
-            })
-                .then(async text => {
-                    console.log(text);
-
-                    // Upload images if images were present in the page
-                    for (let index = 0; index < images.length; index++) {
-                        const imageFileName = images[index];
-                        const path = './pageImages/' + imageFileName + ".png";
-                        uploadAttachement(text.id, path, imageFileName)
-                    }
-
-                    // Lets create child pages
-                    // createPages(text.id,eachPage.children);
-                })
-                .catch(err => {
-                    const errorMsg = `${pageData.title}(${pageUrl}) failed : ${err}`
-                    fs.appendFile('output.txt', errorMsg, function (err) {
-                        if (err) throw err;
-                      });
-                    console.error(err)
-                });
-      
         }
     }
 
@@ -365,7 +377,7 @@ async function run() {
         if (!pageUrl) {
             throw "Please provide page url as fourth argument"
         }
-        createPages(null, [{
+        createPages("98702054", [{
             "value": {
                 "title": pageTitle,
                 "url": pageUrl,
