@@ -36,9 +36,13 @@ function getSupportedStyleString(computedStyle) {
 }
 
 var tagsToReplace = {
-    '&': '&amp;',
     '<': '&lt;',
-    '>': '&gt;'
+    '>': '&gt;',
+    '\/' : '&#47;',
+    '&': '&amp;'
+    // ';' : '&#59;'
+    // '\'' : '&#39;',
+    // '’' : '&#39;'
 };
 
 function replaceTag(tag) {
@@ -46,7 +50,7 @@ function replaceTag(tag) {
 }
 
 function safe_tags_replace(str) {
-    return str.replace(/[&<>]/g, replaceTag);
+    return str.replace(/[&<>/]/g, replaceTag);
 }
 
 var symbolToReplace = {
@@ -81,7 +85,8 @@ function getMatchingSubstr(str1, str2) {
             }
         }
     }
-    return safe_tags_replace(matchedStr)
+    // return safe_tags_replace(matchedStr)
+    return matchedStr
 }
 
 async function getMatchingTrailingStr(text, innerHTML) {
@@ -93,8 +98,8 @@ async function getMatchingTrailingStr(text, innerHTML) {
         } catch (error) {
         }
     }
-    Promise.resolve(str);
-    return str;
+    Promise.resolve(safe_tags_replace(str));
+    return safe_tags_replace(str);
 }
 
 module.exports = {
@@ -136,9 +141,9 @@ module.exports = {
                     text = safe_tags_replace(text)
                     parsedHtml = parsedHtml + text;
                 } else {
-                    const subStr = getMatchingSubstr(text, innerHTML)
+                    let subStr = getMatchingSubstr(text, innerHTML)
                     if (subStr) {
-                        // subStr = safe_tags_replace(subStr)
+                        subStr = safe_tags_replace(subStr)
                         parsedHtml = parsedHtml + subStr;
                     }
 
@@ -170,7 +175,7 @@ module.exports = {
                         attributes.href = first + second
                     }
                 }
-                parsedHtml = `<a href="${attributes ? attributes.href: '#'}">`
+                parsedHtml = `<a href="${attributes && attributes.href ? attributes.href: '#'}">`
                 if (text && ((text == innerHTML || safe_tags_replace(text) == innerHTML) || (innerHTML && (innerHTML.trim().startsWith(text.trim()))))) {
                     text = safe_tags_replace(text)
                     parsedHtml = parsedHtml + text;

@@ -1,13 +1,14 @@
 const fetch = require('node-fetch');
-const FormData = require('form-data');
 const fs = require('fs')
 const request = require('request');
 
 const URL = "https://anabadnan.atlassian.net/wiki/rest/api";
 
+
 const CONTENT_API = URL + '/content';
 
-const API_TOKEN = 'token_here';
+const API_TOKEN = '';
+
 
 module.exports = {
     createPage: async (content, apiToken) => {
@@ -20,6 +21,17 @@ module.exports = {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify(content)
+        });
+    },
+
+    pageExists: async (title, spaceKey) => {
+        // console.log('using token', apiToken)
+        return fetch(`${CONTENT_API}?title=${title}&spaceKey=${spaceKey}&expand=history"`, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Basic ${API_TOKEN}`,
+                'Accept': 'application/json'
+            }
         });
     },
 

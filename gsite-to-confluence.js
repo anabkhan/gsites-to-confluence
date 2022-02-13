@@ -3,7 +3,7 @@ const puppeteer = require('puppeteer-extra');
 const request = require('request');
 const fs = require('fs')
 const { makeChildren } = require('./common-util');
-const { createPage, uploadAttachement } = require('./confluence-utility');
+const { createPage, uploadAttachement, pageExists } = require('./confluence-utility');
 const { parseHTMLDoc, parseElement, getMatchingTrailingStr } = require('./gsite-parser');
 
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
@@ -92,12 +92,12 @@ async function run() {
         return { items, count };
     });
 
-    async function createPages(ancestor, pages) {
+    async function createPages(ancestor, pages, parentTitle) {
         for (let index = 0; index < pages.length; index++) {
             const eachPage = pages[index];
 
             // Get page content if its a page
-            let pageContent = eachPage.value.title;
+            let pageContent = '';
             let images = [];
             if (eachPage.value.url) {
                 const pageUrl = 'https://sites.google.com' + eachPage.value.url;
@@ -259,14 +259,15 @@ async function run() {
                     await bodyHandle.dispose();
 
                     const html = parsedHtml.html
-                    console.log('html',parsedHtml.html)
+                    // console.log('html', parsedHtml.html)
+                    // console.log('pageContent',pageContent)
 
                     if (parsedHtml.images && parsedHtml.images.length > 0) {
                         images = parsedHtml.images;
                     }
 
 
-                    if (html && html != "") {
+                    if (html && html.trim() != "") {
                         pageContent = html;
                     }
 
@@ -312,45 +313,50 @@ async function run() {
                 //     throw "Please provide api token as fifth argument"
                 // }
 
-
-                //    return 
-                await createPage(pageData, apiToken).then(response => {
-                    // console.log('response', response.body)
-                    console.log(
-                        `Page: ${pageData.title} Response: ${response.status} ${response.statusText}`
-                    );
-                    // let responseJson = {response:response.json()}
-                    // if (response.status == 200) {
-                    // } else {
-                    //     console.log('error while creating page ', pageData.title)
-                    // }
-                    // responseJson.status = response.status;
+                // Check if page already exists
+                await pageExists(pageData.title, 'TET').then(response => {
+                    console.log(`Page ${pageData.title} exists check Response: ${response.status} ${response.statusText}`)
                     return response.json()
-                })
-                    .then(async text => {
-                        console.log(text);
-                        // Lets create child pages
-                        if (text && text.statusCode && text.statusCode == 400) {
-                            console.log('error while creating page ', pageData.title)
-                            console.log(text)
-                        } else {
-                            createPages(text.id, eachPage.children);
-                            // Upload images if images were present in the page
-                            for (let index = 0; index < images.length; index++) {
-                                const imageFileName = images[index];
-                                const path = './pageImages/' + imageFileName + ".png";
-                                uploadAttachement(text.id, path, imageFileName)
-                            }
-                        }
-
+                }).then(responseJson => {
+                    console.log('responseJson', responseJson)
+                    if (responseJson.results && responseJson.results.length > 0) {
+                        pageData.title = parentTitle + '-' + pageData.title
+                    }
+                    // return
+                    createPage(pageData, apiToken).then(response => {
+                        // console.log('response', response.body)
+                        console.log(
+                            `Page: ${pageData.title} Response: ${response.status} ${response.statusText}`
+                        );
+                        return response.json()
                     })
-                    .catch(err => {
-                        const errorMsg = `${pageData.title}(${pageUrl}) failed : ${err}`
-                        fs.appendFile('output.txt', errorMsg + "/n", function (err) {
-                            if (err) throw err;
+                        .then(async text => {
+                            // console.log(text);
+                            // Lets create child pages
+                            if (text && text.statusCode && text.statusCode == 400) {
+                                console.log('error while creating page ', pageData.title)
+                                console.log(text)
+                            } else {
+                                createPages(text.id, eachPage.children, pageData.title);
+                                // Upload images if images were present in the page
+                                for (let index = 0; index < images.length; index++) {
+                                    const imageFileName = images[index];
+                                    const path = './pageImages/' + imageFileName + ".png";
+                                    uploadAttachement(text.id, path, imageFileName)
+                                }
+                            }
+
+                        })
+                        .catch(err => {
+                            const errorMsg = `${pageData.title}(${pageUrl}) failed : ${err}`
+                            fs.appendFile('output.txt', errorMsg + "/n", function (err) {
+                                if (err) throw err;
+                            });
+                            console.error(err)
                         });
-                        console.error(err)
-                    });
+                })
+
+
             }
 
 
@@ -364,7 +370,7 @@ async function run() {
     }
 
     if (command && command == 'migrate') {
-        createPages(null, makeChildren(menuParent.items))
+        createPages(null, makeChildren(menuParent.items), null)
     }
 
     if (command && command == 'migratepage') {
@@ -377,14 +383,14 @@ async function run() {
         if (!pageUrl) {
             throw "Please provide page url as fourth argument"
         }
-        createPages("98702054", [{
+        createPages("99452869", [{
             "value": {
                 "title": pageTitle,
                 "url": pageUrl,
                 "type": "page"
             },
             "children": []
-        }])
+        }], null)
 
     }
 }
